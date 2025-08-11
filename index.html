@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crypto Watch – Live Prices</title>
+  <meta name="description" content="Accessible live crypto price dashboard for BTC, ETH, LTC, and DOGE." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://api.coingecko.com" crossorigin>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="app-header" role="banner">
+    <h1 id="app-title">Crypto Watch</h1>
+    <div class="header-actions" role="group" aria-label="Display options">
+      <label for="currency" class="sr-only">Currency</label>
+      <select id="currency" aria-label="Select display currency">
+        <option value="eur" selected>EUR (€)</option>
+        <option value="usd">USD ($)</option>
+        <option value="gbp">GBP (£)</option>
+      </select>
+
+      <label for="refresh" class="sr-only">Refresh interval</label>
+      <select id="refresh" aria-label="Select refresh interval">
+        <option value="15">Refresh: 15s</option>
+        <option value="30" selected>Refresh: 30s</option>
+        <option value="60">Refresh: 60s</option>
+      </select>
+
+      <button id="theme-toggle" class="btn" aria-pressed="false" aria-label="Toggle theme">Toggle theme</button>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section aria-labelledby="prices-heading">
+      <h2 id="prices-heading">Live Prices</h2>
+      <div id="status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+      <ul id="cards" class="cards" role="list">
+        <!-- Cards injected by JS -->
+      </ul>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>&copy; <span id="year"></span> Crypto Watch. All rights reserved.</p>
+    <p>
+      Built for accessibility: fully keyboard navigable, high contrast, screen reader announcements,
+      and semantic markup.
+    </p>
+    <p>
+      Data: CoinGecko public API. No account required.
+    </p>
+  </footer>
+
+  <template id="card-template">
+    <li class="card" role="article" aria-labelledby="tmpl-name">
+      <div class="card-header">
+        <div class="name">
+          <img class="icon" alt="" width="32" height="32" />
+          <span id="tmpl-name" class="asset-name"></span>
+          <span class="ticker" aria-hidden="true"></span>
+        </div>
+        <div class="price-wrap">
+          <span class="price" aria-live="off"></span>
+          <span class="change" aria-live="off"></span>
+        </div>
+      </div>
+      <figure class="chart-wrap">
+        <canvas class="sparkline" width="400" height="120" aria-label="7-day price chart"></canvas>
+        <figcaption class="sr-only chart-desc"></figcaption>
+      </figure>
+    </li>
+  </template>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

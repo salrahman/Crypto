@@ -1,0 +1,261 @@
+// Crypto Watch – accessible live dashboard
+// Data from CoinGecko public API.
+
+const COINS = [
+  { id: "solana",    symbol: "SOL", name: "Solana", icon: "https://assets.coingecko.com/coins/images/4128/large/solana.png" },
+  { id: "bitcoin",   symbol: "BTC", name: "Bitcoin",  icon: "https://assets.coingecko.com/coins/images/1/large/bitcoin.png" },
+  { id: "ethereum",  symbol: "ETH", name: "Ethereum", icon: "https://assets.coingecko.com/coins/images/279/large/ethereum.png" },
+  { id: "litecoin",  symbol: "LTC", name: "Litecoin", icon: "https://assets.coingecko.com/coins/images/2/large/litecoin.png" },
+  { id: "dogecoin",  symbol: "DOGE", name: "Dogecoin", icon: "https://assets.coingecko.com/coins/images/5/large/dogecoin.png" },
+];
+
+const state = {
+  currency: localStorage.getItem('currency') || 'eur',
+  intervalSec: Number(localStorage.getItem('intervalSec') || 30),
+  theme: localStorage.getItem('theme') || null, // null defers to system
+  prices: {},
+  charts: {},
+  timers: { main: null },
+};
+
+const elCards = document.getElementById('cards');
+const elCurrency = document.getElementById('currency');
+const elRefresh = document.getElementById('refresh');
+const elThemeToggle = document.getElementById('theme-toggle');
+const elStatus = document.getElementById('status');
+
+document.getElementById('year').textContent = new Date().getFullYear();
+
+// Theme
+function applyTheme() {
+  if (state.theme) {
+    document.documentElement.setAttribute('data-theme', state.theme);
+    elThemeToggle.setAttribute('aria-pressed', state.theme === 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    elThemeToggle.setAttribute('aria-pressed', 'false');
+  }
+}
+applyTheme();
+
+elThemeToggle.addEventListener('click', () => {
+  state.theme = state.theme === 'light' ? null : 'light';
+  localStorage.setItem('theme', state.theme ?? '');
+  applyTheme();
+});
+
+// Controls
+elCurrency.value = state.currency;
+elRefresh.value = String(state.intervalSec);
+
+elCurrency.addEventListener('change', () => {
+  state.currency = elCurrency.value;
+  localStorage.setItem('currency', state.currency);
+  announce(`Currency changed to ${labelForCurrency(state.currency)}.`);
+  refreshAll();
+});
+
+elRefresh.addEventListener('change', () => {
+  state.intervalSec = Number(elRefresh.value);
+  localStorage.setItem('intervalSec', state.intervalSec);
+  announce(`Refresh interval set to ${state.intervalSec} seconds.`);
+  schedule();
+});
+
+// Build cards
+function buildCards() {
+  elCards.innerHTML = '';
+  const tpl = document.getElementById('card-template');
+  for (const coin of COINS) {
+    const node = tpl.content.cloneNode(true);
+    const li = node.querySelector('li');
+    const name = node.querySelector('.asset-name');
+    const ticker = node.querySelector('.ticker');
+    const icon = node.querySelector('.icon');
+    const price = node.querySelector('.price');
+    const change = node.querySelector('.change');
+    const canvas = node.querySelector('canvas.sparkline');
+    const desc = node.querySelector('.chart-desc');
+
+    name.textContent = coin.name;
+    ticker.textContent = coin.symbol;
+    icon.src = coin.icon;
+    icon.alt = '';
+
+    price.id = `price-${coin.id}`;
+    change.id = `change-${coin.id}`;
+    canvas.id = `spark-${coin.id}`;
+    desc.id = `desc-${coin.id}`;
+    canvas.setAttribute('aria-describedby', desc.id);
+
+    elCards.appendChild(node);
+  }
+}
+
+function labelForCurrency(code) {
+  return { eur: 'euros', usd: 'US dollars', gbp: 'British pounds' }[code] || code;
+}
+
+function formatMoney(value, code) {
+  const map = { eur: 'EUR', usd: 'USD', gbp: 'GBP' };
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: map[code] || 'EUR', maximumFractionDigits: 2 }).format(value);
+}
+
+async function fetchPrices() {
+  const ids = COINS.map(c => c.id).join(',');
+  const vs = ['eur','usd','gbp'].join(',');
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=${vs}&include_24hr_change=true`;
+
+  const res = await fetch(url, { headers: { 'accept': 'application/json' } });
+  if (!res.ok) throw new Error(`Price request failed: ${res.status}`);
+  return res.json();
+}
+
+async function fetchChart(coinId, vsCurrency) {
+  const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=${vsCurrency}&days=7&interval=hourly`;
+  const res = await fetch(url, { headers: { 'accept': 'application/json' } });
+  if (!res.ok) throw new Error(`Chart request failed: ${res.status}`);
+  return res.json();
+}
+
+function renderPrices(data) {
+  for (const coin of COINS) {
+    const p = data[coin.id];
+    if (!p) continue;
+    const priceEl = document.getElementById(`price-${coin.id}`);
+    const changeEl = document.getElementById(`change-${coin.id}`);
+
+    const price = p[state.currency];
+    const ch = p[`${state.currency}_24h_change`];
+
+    const prev = Number(priceEl.dataset.value || NaN);
+    priceEl.textContent = formatMoney(price, state.currency);
+    priceEl.dataset.value = String(price);
+
+    const up = !Number.isNaN(prev) && price > prev;
+    const down = !Number.isNaN(prev) && price < prev;
+    if (up || down) {
+      priceEl.classList.remove('pulse');
+      void priceEl.offsetWidth; // restart animation
+      priceEl.classList.add('pulse');
+      setTimeout(()=>priceEl.classList.remove('pulse'), 600);
+      announce(`${coin.name} ${up ? 'up' : 'down'} to ${formatMoney(price, state.currency)}.`);
+    }
+
+    const chFixed = (ch ?? 0).toFixed(2);
+    changeEl.textContent = `${chFixed}% 24h`;
+    changeEl.classList.toggle('up', (ch ?? 0) >= 0);
+    changeEl.classList.toggle('down', (ch ?? 0) < 0);
+  }
+}
+
+function announce(msg) {
+  // Screen reader announcements
+  elStatus.textContent = msg;
+  // Clear quickly so the same message can be announced again if needed
+  setTimeout(() => { elStatus.textContent = ''; }, 500);
+}
+
+function drawSparkline(canvas, points, label) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Clear
+  ctx.clearRect(0, 0, w, h);
+
+  const values = points.map(p => p[1]);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const pad = 6;
+
+  const xStep = (w - pad * 2) / (points.length - 1 || 1);
+  const scale = (val) => {
+    if (max === min) return h / 2;
+    return h - pad - ((val - min) / (max - min)) * (h - pad * 2);
+  };
+
+  // Path
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pad, scale(values[0]));
+  for (let i = 1; i < values.length; i++) {
+    const x = pad + xStep * i;
+    const y = scale(values[i]);
+    ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3ea6ff';
+  ctx.stroke();
+
+  // Min/Max markers
+  ctx.beginPath();
+  ctx.arc(pad, scale(values[0]), 2.5, 0, Math.PI * 2);
+  ctx.arc(w - pad, scale(values[values.length - 1]), 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#e9eef1';
+  ctx.fill();
+
+  // Update description for screen readers
+  const desc = canvas.parentElement.querySelector('.chart-desc');
+  const minVal = Math.min(...values).toFixed(2);
+  const maxVal = Math.max(...values).toFixed(2);
+  desc.textContent = label + `. 7-day range ${minVal} to ${maxVal} in ${labelForCurrency(state.currency)}.`;
+}
+
+async function renderCharts() {
+  for (const coin of COINS) {
+    try {
+      const data = await fetchChart(coin.id, state.currency);
+      const points = data.prices; // [ [ts, price], ... ]
+      const canvas = document.getElementById(`spark-${coin.id}`);
+      drawSparkline(canvas, points, `${coin.name} price`);
+    } catch (err) {
+      console.error('Chart error', coin.id, err);
+    }
+  }
+}
+
+async function refreshAll() {
+  try {
+    const data = await fetchPrices();
+    state.prices = data;
+    renderPrices(data);
+    renderCharts();
+  } catch (err) {
+    console.error(err);
+    announce('Failed to fetch latest prices.');
+  }
+}
+
+function schedule() {
+  if (state.timers.main) clearInterval(state.timers.main);
+  state.timers.main = setInterval(refreshAll, state.intervalSec * 1000);
+}
+
+function init() {
+  buildCards();
+  refreshAll();
+  schedule();
+  // Accessibility: focus main after load for skip-link
+  if (location.hash === '#main') {
+    document.getElementById('main').focus();
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  // Pause updates in background to save API calls.
+  if (document.hidden) {
+    if (state.timers.main) clearInterval(state.timers.main);
+  } else {
+    schedule();
+    refreshAll();
+  }
+});
+
+// Small pulse animation via CSS
+const style = document.createElement('style');
+style.textContent = `
+  .pulse { transition: transform .15s ease; transform: scale(1.02); }
+`;
+document.head.appendChild(style);
+
+init();
