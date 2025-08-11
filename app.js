@@ -120,16 +120,13 @@ function buildCards() {
     const canvas = node.querySelector('canvas.sparkline');
     const desc = node.querySelector('.chart-desc');
 
-    // Unique ids per coin
     const nameId = `name-${coin.id}`;
     const priceId = `price-${coin.id}`;
     const changeId = `change-${coin.id}`;
 
     li.id = `card-${coin.id}`;
-    li.tabIndex = 0; // focusable so SR users land on the card
-    // Initially, use aria-labelledby to concat name + price;
-    // we'll also set aria-label in renderPrices with live values.
-    li.setAttribute('aria-labelledby', `${nameId} ${priceId}`);
+    li.tabIndex = 0; // Focusable card for screen readers and keyboard users
+    li.setAttribute('aria-labelledby', `${nameId} ${priceId}`); // Read name + price together
 
     name.id = nameId;
     name.textContent = coin.name;
@@ -145,6 +142,8 @@ function buildCards() {
     elCards.appendChild(node);
   }
 }
+}
+
 function labelForCurrency(code) {
   return { eur: 'euros', usd: 'US dollars', gbp: 'British pounds' }[code] || code;
 }
@@ -202,12 +201,6 @@ function renderPrices(data) {
     changeEl.textContent = `${chFixed}% 24h`; 
     changeEl.classList.toggle('up', (ch ?? 0) >= 0);
     changeEl.classList.toggle('down', (ch ?? 0) < 0);
-
-    // Update the card's accessible name so SR announces coin + price together
-    const li = document.getElementById(`card-${coin.id}`);
-    if (li) {
-      li.setAttribute('aria-label', `${coin.name} ${formatMoney(price, state.currency)}, ${chFixed}% 24h`);
-    }
   }
 }
 
