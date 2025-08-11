@@ -1,13 +1,27 @@
 // Crypto Watch – accessible live dashboard
-// Data from CoinGecko public API.
+// Data from CoinGecko API (Demo/Pro).
 
 const COINS = [
-  { id: "solana",    symbol: "SOL", name: "Solana", icon: "https://assets.coingecko.com/coins/images/4128/large/solana.png" },
   { id: "bitcoin",   symbol: "BTC", name: "Bitcoin",  icon: "https://assets.coingecko.com/coins/images/1/large/bitcoin.png" },
   { id: "ethereum",  symbol: "ETH", name: "Ethereum", icon: "https://assets.coingecko.com/coins/images/279/large/ethereum.png" },
   { id: "litecoin",  symbol: "LTC", name: "Litecoin", icon: "https://assets.coingecko.com/coins/images/2/large/litecoin.png" },
   { id: "dogecoin",  symbol: "DOGE", name: "Dogecoin", icon: "https://assets.coingecko.com/coins/images/5/large/dogecoin.png" },
+  { id: "solana",    symbol: "SOL", name: "Solana",   icon: "https://assets.coingecko.com/coins/images/4128/large/solana.png" },
 ];
+
+// --- CoinGecko endpoint/key handling ---
+function getCgConfig() {
+  const key = (localStorage.getItem('cg_api_key') || '').trim();
+  const base = key ? 'https://pro-api.coingecko.com/api/v3' : 'https://api.coingecko.com/api/v3';
+  return { key, base };
+}
+const { key: CG_KEY, base: COINGECKO_BASE } = getCgConfig();
+function withKey(url) {
+  if (!CG_KEY) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  // newer docs support x_cg_pro_api_key; demo keys also work
+  return url + sep + 'x_cg_pro_api_key=' + encodeURIComponent(CG_KEY);
+}
 
 const state = {
   currency: localStorage.getItem('currency') || 'eur',
@@ -23,8 +37,20 @@ const elCurrency = document.getElementById('currency');
 const elRefresh = document.getElementById('refresh');
 const elThemeToggle = document.getElementById('theme-toggle');
 const elStatus = document.getElementById('status');
+const elKey = document.getElementById('api-key');
+const elSaveKey = document.getElementById('save-key');
 
 document.getElementById('year').textContent = new Date().getFullYear();
+
+// Key input handlers
+if (elKey && elSaveKey) {
+  elKey.value = localStorage.getItem('cg_api_key') || '';
+  elSaveKey.addEventListener('click', () => {
+    localStorage.setItem('cg_api_key', elKey.value.trim());
+    announce('API key saved. Refreshing data...');
+    location.reload();
+  });
+}
 
 // Theme
 function applyTheme() {
@@ -68,7 +94,6 @@ function buildCards() {
   const tpl = document.getElementById('card-template');
   for (const coin of COINS) {
     const node = tpl.content.cloneNode(true);
-    const li = node.querySelector('li');
     const name = node.querySelector('.asset-name');
     const ticker = node.querySelector('.ticker');
     const icon = node.querySelector('.icon');
@@ -101,20 +126,32 @@ function formatMoney(value, code) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: map[code] || 'EUR', maximumFractionDigits: 2 }).format(value);
 }
 
+async function safeFetch(url, options = {}) {
+  try {
+    const res = await fetch(url, options);
+    if (!res.ok) {
+      let text = '';
+      try { text = await res.text(); } catch {}
+      throw new Error(`HTTP ${res.status} ${res.statusText} ${text ? '- ' + text.slice(0,120) : ''}`);
+    }
+    return res;
+  } catch (err) {
+    throw new Error('Network error: ' + (err && err.message ? err.message : String(err)));
+  }
+}
+
 async function fetchPrices() {
   const ids = COINS.map(c => c.id).join(',');
   const vs = ['eur','usd','gbp'].join(',');
-  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=${vs}&include_24hr_change=true`;
+  const url = withKey(`${COINGECKO_BASE}/simple/price?ids=${ids}&vs_currencies=${vs}&include_24hr_change=true`);
 
-  const res = await fetch(url, { headers: { 'accept': 'application/json' } });
-  if (!res.ok) throw new Error(`Price request failed: ${res.status}`);
+  const res = await safeFetch(url, { headers: { 'accept': 'application/json' } });
   return res.json();
 }
 
 async function fetchChart(coinId, vsCurrency) {
-  const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=${vsCurrency}&days=7&interval=hourly`;
-  const res = await fetch(url, { headers: { 'accept': 'application/json' } });
-  if (!res.ok) throw new Error(`Chart request failed: ${res.status}`);
+  const url = withKey(`${COINGECKO_BASE}/coins/${coinId}/market_chart?vs_currency=${vsCurrency}&days=7&interval=hourly`);
+  const res = await safeFetch(url, { headers: { 'accept': 'application/json' } });
   return res.json();
 }
 
@@ -143,7 +180,7 @@ function renderPrices(data) {
     }
 
     const chFixed = (ch ?? 0).toFixed(2);
-    changeEl.textContent = `${chFixed}% 24h`;
+    changeEl.textContent = `${chFixed}% 24h`; 
     changeEl.classList.toggle('up', (ch ?? 0) >= 0);
     changeEl.classList.toggle('down', (ch ?? 0) < 0);
   }
@@ -205,9 +242,9 @@ async function renderCharts() {
   for (const coin of COINS) {
     try {
       const data = await fetchChart(coin.id, state.currency);
-      const points = data.prices; // [ [ts, price], ... ]
+      const points = data.prices || []; // [ [ts, price], ... ]
       const canvas = document.getElementById(`spark-${coin.id}`);
-      drawSparkline(canvas, points, `${coin.name} price`);
+      if (points.length) drawSparkline(canvas, points, `${coin.name} price`);
     } catch (err) {
       console.error('Chart error', coin.id, err);
     }
@@ -222,7 +259,7 @@ async function refreshAll() {
     renderCharts();
   } catch (err) {
     console.error(err);
-    announce('Failed to fetch latest prices.');
+    announce('Failed to fetch latest prices. Try saving a CoinGecko API key or wait and retry.');
   }
 }
 

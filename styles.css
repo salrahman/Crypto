@@ -80,6 +80,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
+  flex-wrap: wrap;
 }
 
 #app-title { margin: 0; font-size: clamp(1.25rem, 2vw + .5rem, 1.75rem); }
@@ -88,9 +89,10 @@ body {
   display: flex;
   gap: .5rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
-select, .btn {
+select, .btn, .input {
   background: var(--bg);
   color: var(--text);
   border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
@@ -98,7 +100,7 @@ select, .btn {
   padding: .55rem .75rem;
   font-size: 1rem;
 }
-select:focus, .btn:focus {
+select:focus, .btn:focus, .input:focus {
   outline: none;
   box-shadow: 0 0 0 var(--ring) var(--focus);
 }

@@ -3,14 +3,19 @@ A modern, clean, and **accessible** crypto price dashboard for Bitcoin (BTC), Et
 
 ## Features
 - Live prices (EUR/USD/GBP) with 24h change
-- Minimal 7‑day sparkline per coin
+- Minimal 7-day sparkline per coin
 - Screen reader announcements for updates
 - Keyboard friendly, high contrast, focus-visible
 - Theme toggle (respects system theme by default)
-- No build step, no keys, just static files
+- No build step, no keys *required* for layout — but see key note below
 
 ## Data Source
-Prices and charts are fetched client-side from the [CoinGecko public API](https://www.coingecko.com/). If CoinGecko later requires an API key, you can switch providers by editing `app.js` where `fetchPrices`/`fetchChart` are defined.
+Prices and charts are fetched client-side from the **CoinGecko API**. CoinGecko deprecated the keyless API; for reliability, use a free **Demo** API key.
+
+## Using a CoinGecko API Key (recommended)
+1. Create a CoinGecko account and get a free **Demo** API key from the Developer Dashboard.
+2. Open the app and paste the key into the **API key** field in the header, then click **Save**.  
+3. When a key is present, the app uses `https://pro-api.coingecko.com/api/v3` and appends your key as `x_cg_pro_api_key`.
 
 ## Local Development
 Just open `index.html` in a browser, or serve the folder:
@@ -22,7 +27,8 @@ python3 -m http.server 8080
 1. Create a new public repo (e.g., `crypto-watch`).
 2. Add these files, commit, and push to `main`.
 3. In **Settings → Pages**, set **Source** to `Deploy from a branch`, then pick `main` and `/ (root)`.
-4. Wait a minute—your site will be live at `https://<your-user>.github.io/<repo>/`.
+4. Optional: add a `.nojekyll` file at the repo root.
+5. Wait a minute—your site will be live at `https://<your-user>.github.io/<repo>/`.
 
 ## Accessibility Notes
 - Landmarks: header, main, footer

@@ -4,8 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Crypto Watch – Live Prices</title>
-  <meta name="description" content="Accessible live crypto price dashboard for BTC, ETH, LTC, and DOGE." />
+  <meta name="description" content="Accessible live crypto price dashboard for BTC, ETH, LTC, DOGE, SOL." />
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://pro-api.coingecko.com" crossorigin>
   <link rel="preconnect" href="https://api.coingecko.com" crossorigin>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -15,6 +16,11 @@
   <header class="app-header" role="banner">
     <h1 id="app-title">Crypto Watch</h1>
     <div class="header-actions" role="group" aria-label="Display options">
+      <label for="api-key" class="sr-only">CoinGecko API Key (Demo/Pro)</label>
+      <input id="api-key" type="password" inputmode="text" autocomplete="off"
+             aria-label="CoinGecko API key" placeholder="API key (optional)" class="input" />
+      <button id="save-key" class="btn" aria-label="Save API key">Save</button>
+
       <label for="currency" class="sr-only">Currency</label>
       <select id="currency" aria-label="Select display currency">
         <option value="eur" selected>EUR (€)</option>
@@ -51,7 +57,7 @@
       and semantic markup.
     </p>
     <p>
-      Data: CoinGecko public API. No account required.
+      Data: CoinGecko API (Demo/Pro). No server required.
     </p>
   </footer>
 
