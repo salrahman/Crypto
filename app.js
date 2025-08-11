@@ -138,7 +138,7 @@ function labelForCurrency(code) {
 
 function formatMoney(value, code) {
   const map = { eur: 'EUR', usd: 'USD', gbp: 'GBP' };
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: map[code] || 'EUR', maximumFractionDigits: 2 }).format(value);
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: map[code] || 'EUR', maximumFractionDigits: 2 }).format(value).replace(/\s*[A-Z]{3}$/,'');
 }
 
 async function safeFetch(url, options = {}) {
