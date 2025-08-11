@@ -138,21 +138,12 @@ function labelForCurrency(code) {
 
 function formatMoney(value, code) {
   const map = { eur: 'EUR', usd: 'USD', gbp: 'GBP' };
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: map[code] || 'EUR', maximumFractionDigits: 2 }).format(value).replace(/\s*[A-Z]{3}$/,'');
-}
-
-async function safeFetch(url, options = {}) {
-  try {
-    const res = await fetch(url, options);
-    if (!res.ok) {
-      let text = '';
-      try { text = await res.text(); } catch {}
-      throw new Error(`HTTP ${res.status} ${res.statusText}${text ? ' — ' + text.slice(0,120) : ''}`);
-    }
-    return res;
-  } catch (err) {
-    throw new Error('Network error: ' + (err && err.message ? err.message : String(err)));
-  }
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: map[code] || 'EUR',
+    currencyDisplay: 'symbol',
+    maximumFractionDigits: 2
+  }).format(value);
 }
 
 async function fetchPrices() {
