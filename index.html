@@ -42,8 +42,9 @@
   <main id="main" tabindex="-1">
     <section aria-labelledby="prices-heading">
       <h2 id="prices-heading">Live Prices</h2>
+
+      <div id="error" role="alert" class="error" aria-live="assertive" hidden></div>
       <div id="status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
-      <div id="error" role="alert" class="error" aria-live="assertive"></div>
 
       <ul id="cards" class="cards" role="list">
         <!-- Cards injected by JS -->
@@ -56,11 +57,11 @@
   </footer>
 
   <template id="card-template">
-    <li class="card" role="article" aria-labelledby="tmpl-name">
+    <li class="card" role="article">
       <div class="card-header">
         <div class="name">
           <img class="icon" alt="" width="32" height="32" />
-          <span id="tmpl-name" class="asset-name"></span>
+          <span class="asset-name"></span>
           <span class="ticker" aria-hidden="true"></span>
         </div>
         <div class="price-wrap">
@@ -75,6 +76,29 @@
     </li>
   </template>
 
-  <script src="app.js" type="module"></script>
+  <noscript>
+    <div class="error">This site needs JavaScript to fetch live prices.</div>
+  </noscript>
+
+  <script>
+    // Show JS errors in-page for quick debugging
+    (function(){
+      function show(msg){
+        var el = document.getElementById('error');
+        if(!el) return;
+        el.textContent = msg;
+        el.hidden = false;
+      }
+      window.addEventListener('error', function(e){
+        show('Script error: ' + (e && e.message ? e.message : 'Unknown'));
+      });
+      window.addEventListener('unhandledrejection', function(e){
+        show('Network or promise error: ' + (e && e.reason ? (e.reason.message || e.reason) : 'Unknown'));
+      });
+    })();
+  </script>
+
+  <!-- cache-bust app.js to avoid stale browser caches -->
+  <script src="app.js?v=3" type="module"></script>
 </body>
 </html>

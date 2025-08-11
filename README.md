@@ -1,15 +1,9 @@
-# Crypto Watch (Accessible)
-A modern, clean, and **accessible** crypto price dashboard for Bitcoin (BTC), Ethereum (ETH), Litecoin (LTC), Dogecoin (DOGE), and Solana (SOL).
+# Crypto Watch (stable v3)
+Accessible crypto price dashboard for BTC, ETH, LTC, DOGE, SOL.
 
-## API keys: Demo vs Pro
-- **Demo (free)** keys work on `https://api.coingecko.com/api/v3` with `x_cg_demo_api_key` (or header `x-cg-demo-api-key`).  
-- **Pro (paid)** keys work on `https://pro-api.coingecko.com/api/v3` with `x_cg_pro_api_key` (or header `x-cg-pro-api-key`).  
-Paste your key and click **Save**. The app probes ping endpoints to auto-detect which plan your key belongs to.
+- Reads coin **and price together** via `aria-labelledby` on each card.
+- Auto-detects CoinGecko **Demo vs Pro** keys.
+- Shows error messages on the page if something goes wrong.
+- Cache-busted script (`app.js?v=3`) to avoid stale caches after updates.
 
-## Deploy to GitHub Pages
-1. Add these files at the repo root and enable Pages (Deploy from a branch → `main` → `/ (root)`).  
-2. Optional: add `.nojekyll` at the repo root.
-
-Accessibility: skip-link, landmarks, live announcements, chart descriptions.
-
-© 2025 Crypto Watch. All rights reserved.
+Deploy to GitHub Pages by placing all files at the repo root and enabling Pages.
