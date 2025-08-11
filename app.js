@@ -1,5 +1,5 @@
 // Crypto Watch – accessible live dashboard
-// Data from CoinGecko API (Demo/Pro).
+// Data from CoinGecko API (Demo or Pro).
 
 const COINS = [
   { id: "bitcoin",   symbol: "BTC", name: "Bitcoin",  icon: "https://assets.coingecko.com/coins/images/1/large/bitcoin.png" },
@@ -9,26 +9,39 @@ const COINS = [
   { id: "solana",    symbol: "SOL", name: "Solana",   icon: "https://assets.coingecko.com/coins/images/4128/large/solana.png" },
 ];
 
-// --- CoinGecko endpoint/key handling ---
-function getCgConfig() {
+// --- Auto-detect Demo vs Pro ---
+async function resolveCgAuth() {
   const key = (localStorage.getItem('cg_api_key') || '').trim();
-  const base = key ? 'https://pro-api.coingecko.com/api/v3' : 'https://api.coingecko.com/api/v3';
-  return { key, base };
+  if (!key) return { base: 'https://api.coingecko.com/api/v3', qp: null, plan: 'none' };
+
+  // Try Demo
+  try {
+    const r = await fetch(`https://api.coingecko.com/api/v3/ping?x_cg_demo_api_key=${encodeURIComponent(key)}`);
+    if (r.ok) return { base: 'https://api.coingecko.com/api/v3', qp: 'x_cg_demo_api_key', plan: 'demo' };
+  } catch {}
+
+  // Try Pro
+  try {
+    const r2 = await fetch(`https://pro-api.coingecko.com/api/v3/ping?x_cg_pro_api_key=${encodeURIComponent(key)}`);
+    if (r2.ok) return { base: 'https://pro-api.coingecko.com/api/v3', qp: 'x_cg_pro_api_key', plan: 'pro' };
+  } catch {}
+
+  return { base: 'https://api.coingecko.com/api/v3', qp: null, plan: 'unknown' };
 }
-const { key: CG_KEY, base: COINGECKO_BASE } = getCgConfig();
+
+let CG = { base: 'https://api.coingecko.com/api/v3', qp: null, plan: 'none' };
 function withKey(url) {
-  if (!CG_KEY) return url;
+  const key = (localStorage.getItem('cg_api_key') || '').trim();
+  if (!key || !CG.qp) return url;
   const sep = url.includes('?') ? '&' : '?';
-  // newer docs support x_cg_pro_api_key; demo keys also work
-  return url + sep + 'x_cg_pro_api_key=' + encodeURIComponent(CG_KEY);
+  return url + sep + CG.qp + '=' + encodeURIComponent(key);
 }
 
 const state = {
   currency: localStorage.getItem('currency') || 'eur',
   intervalSec: Number(localStorage.getItem('intervalSec') || 30),
-  theme: localStorage.getItem('theme') || null, // null defers to system
+  theme: localStorage.getItem('theme') || null,
   prices: {},
-  charts: {},
   timers: { main: null },
 };
 
@@ -37,18 +50,21 @@ const elCurrency = document.getElementById('currency');
 const elRefresh = document.getElementById('refresh');
 const elThemeToggle = document.getElementById('theme-toggle');
 const elStatus = document.getElementById('status');
+const elError = document.getElementById('error');
 const elKey = document.getElementById('api-key');
 const elSaveKey = document.getElementById('save-key');
 
 document.getElementById('year').textContent = new Date().getFullYear();
 
-// Key input handlers
 if (elKey && elSaveKey) {
   elKey.value = localStorage.getItem('cg_api_key') || '';
-  elSaveKey.addEventListener('click', () => {
+  elSaveKey.addEventListener('click', async () => {
     localStorage.setItem('cg_api_key', elKey.value.trim());
-    announce('API key saved. Refreshing data...');
-    location.reload();
+    elError.textContent = '';
+    elError.style.display = 'none';
+    announce('API key saved. Detecting plan and refreshing data...');
+    CG = await resolveCgAuth();
+    refreshAll();
   });
 }
 
@@ -104,8 +120,7 @@ function buildCards() {
 
     name.textContent = coin.name;
     ticker.textContent = coin.symbol;
-    icon.src = coin.icon;
-    icon.alt = '';
+    icon.src = coin.icon; icon.alt = '';
 
     price.id = `price-${coin.id}`;
     change.id = `change-${coin.id}`;
@@ -132,7 +147,7 @@ async function safeFetch(url, options = {}) {
     if (!res.ok) {
       let text = '';
       try { text = await res.text(); } catch {}
-      throw new Error(`HTTP ${res.status} ${res.statusText} ${text ? '- ' + text.slice(0,120) : ''}`);
+      throw new Error(`HTTP ${res.status} ${res.statusText}${text ? ' — ' + text.slice(0,120) : ''}`);
     }
     return res;
   } catch (err) {
@@ -143,14 +158,14 @@ async function safeFetch(url, options = {}) {
 async function fetchPrices() {
   const ids = COINS.map(c => c.id).join(',');
   const vs = ['eur','usd','gbp'].join(',');
-  const url = withKey(`${COINGECKO_BASE}/simple/price?ids=${ids}&vs_currencies=${vs}&include_24hr_change=true`);
+  const url = withKey(`${CG.base}/simple/price?ids=${ids}&vs_currencies=${vs}&include_24hr_change=true`);
 
   const res = await safeFetch(url, { headers: { 'accept': 'application/json' } });
   return res.json();
 }
 
 async function fetchChart(coinId, vsCurrency) {
-  const url = withKey(`${COINGECKO_BASE}/coins/${coinId}/market_chart?vs_currency=${vsCurrency}&days=7&interval=hourly`);
+  const url = withKey(`${CG.base}/coins/${coinId}/market_chart?vs_currency=${vsCurrency}&days=7&interval=hourly`);
   const res = await safeFetch(url, { headers: { 'accept': 'application/json' } });
   return res.json();
 }
@@ -173,7 +188,7 @@ function renderPrices(data) {
     const down = !Number.isNaN(prev) && price < prev;
     if (up || down) {
       priceEl.classList.remove('pulse');
-      void priceEl.offsetWidth; // restart animation
+      void priceEl.offsetWidth;
       priceEl.classList.add('pulse');
       setTimeout(()=>priceEl.classList.remove('pulse'), 600);
       announce(`${coin.name} ${up ? 'up' : 'down'} to ${formatMoney(price, state.currency)}.`);
@@ -187,51 +202,40 @@ function renderPrices(data) {
 }
 
 function announce(msg) {
-  // Screen reader announcements
   elStatus.textContent = msg;
-  // Clear quickly so the same message can be announced again if needed
   setTimeout(() => { elStatus.textContent = ''; }, 500);
+}
+
+function showError(msg) {
+  elError.textContent = msg;
+  elError.style.display = 'block';
 }
 
 function drawSparkline(canvas, points, label) {
   const ctx = canvas.getContext('2d');
-  const w = canvas.width;
-  const h = canvas.height;
-
-  // Clear
+  const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
   const values = points.map(p => p[1]);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const pad = 6;
-
+  const min = Math.min(...values), max = Math.max(...values), pad = 6;
   const xStep = (w - pad * 2) / (points.length - 1 || 1);
-  const scale = (val) => {
-    if (max === min) return h / 2;
-    return h - pad - ((val - min) / (max - min)) * (h - pad * 2);
-  };
+  const scale = v => max === min ? h/2 : h - pad - ((v - min)/(max - min)) * (h - pad*2);
 
-  // Path
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(pad, scale(values[0]));
   for (let i = 1; i < values.length; i++) {
-    const x = pad + xStep * i;
-    const y = scale(values[i]);
-    ctx.lineTo(x, y);
+    ctx.lineTo(pad + xStep * i, scale(values[i]));
   }
   ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3ea6ff';
   ctx.stroke();
 
-  // Min/Max markers
   ctx.beginPath();
-  ctx.arc(pad, scale(values[0]), 2.5, 0, Math.PI * 2);
-  ctx.arc(w - pad, scale(values[values.length - 1]), 2.5, 0, Math.PI * 2);
+  ctx.arc(pad, scale(values[0]), 2.5, 0, Math.PI*2);
+  ctx.arc(w - pad, scale(values[values.length-1]), 2.5, 0, Math.PI*2);
   ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#e9eef1';
   ctx.fill();
 
-  // Update description for screen readers
   const desc = canvas.parentElement.querySelector('.chart-desc');
   const minVal = Math.min(...values).toFixed(2);
   const maxVal = Math.max(...values).toFixed(2);
@@ -242,7 +246,7 @@ async function renderCharts() {
   for (const coin of COINS) {
     try {
       const data = await fetchChart(coin.id, state.currency);
-      const points = data.prices || []; // [ [ts, price], ... ]
+      const points = data.prices || [];
       const canvas = document.getElementById(`spark-${coin.id}`);
       if (points.length) drawSparkline(canvas, points, `${coin.name} price`);
     } catch (err) {
@@ -254,12 +258,13 @@ async function renderCharts() {
 async function refreshAll() {
   try {
     const data = await fetchPrices();
-    state.prices = data;
+    if (!data || typeof data !== 'object') throw new Error('Empty response');
     renderPrices(data);
     renderCharts();
+    elError.style.display = 'none';
   } catch (err) {
     console.error(err);
-    announce('Failed to fetch latest prices. Try saving a CoinGecko API key or wait and retry.');
+    showError('Failed to fetch prices. If you entered a key, make sure it matches your plan (Demo vs Pro). You can try again in a minute.');
   }
 }
 
@@ -268,18 +273,15 @@ function schedule() {
   state.timers.main = setInterval(refreshAll, state.intervalSec * 1000);
 }
 
-function init() {
+async function init() {
   buildCards();
+  CG = await resolveCgAuth();
   refreshAll();
   schedule();
-  // Accessibility: focus main after load for skip-link
-  if (location.hash === '#main') {
-    document.getElementById('main').focus();
-  }
+  if (location.hash === '#main') document.getElementById('main').focus();
 }
 
 document.addEventListener('visibilitychange', () => {
-  // Pause updates in background to save API calls.
   if (document.hidden) {
     if (state.timers.main) clearInterval(state.timers.main);
   } else {
@@ -288,11 +290,8 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Small pulse animation via CSS
 const style = document.createElement('style');
-style.textContent = `
-  .pulse { transition: transform .15s ease; transform: scale(1.02); }
-`;
+style.textContent = `.pulse { transition: transform .15s ease; transform: scale(1.02); }`;
 document.head.appendChild(style);
 
 init();

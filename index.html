@@ -16,7 +16,7 @@
   <header class="app-header" role="banner">
     <h1 id="app-title">Crypto Watch</h1>
     <div class="header-actions" role="group" aria-label="Display options">
-      <label for="api-key" class="sr-only">CoinGecko API Key (Demo/Pro)</label>
+      <label for="api-key" class="sr-only">CoinGecko API Key (Demo or Pro)</label>
       <input id="api-key" type="password" inputmode="text" autocomplete="off"
              aria-label="CoinGecko API key" placeholder="API key (optional)" class="input" />
       <button id="save-key" class="btn" aria-label="Save API key">Save</button>
@@ -43,6 +43,7 @@
     <section aria-labelledby="prices-heading">
       <h2 id="prices-heading">Live Prices</h2>
       <div id="status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+      <div id="error" role="alert" class="error" aria-live="assertive"></div>
 
       <ul id="cards" class="cards" role="list">
         <!-- Cards injected by JS -->
@@ -53,11 +54,7 @@
   <footer class="app-footer">
     <p>&copy; <span id="year"></span> Crypto Watch. All rights reserved.</p>
     <p>
-      Built for accessibility: fully keyboard navigable, high contrast, screen reader announcements,
-      and semantic markup.
-    </p>
-    <p>
-      Data: CoinGecko API (Demo/Pro). No server required.
+      Data: CoinGecko API. Use a free Demo key or Pro key (optional).
     </p>
   </footer>
 
